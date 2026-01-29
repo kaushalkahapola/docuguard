@@ -13,7 +13,7 @@ const MOCK_DOCUMENTS = [
 ];
 
 export default function DashboardPage() {
-    const { user, role, isLoading, logout } = useAuth();
+    const { user, idToken, role, isLoading, logout } = useAuth();
     const router = useRouter();
 
     // Redirect to login if not authenticated
@@ -34,8 +34,34 @@ export default function DashboardPage() {
     if (!user) return null;
 
     async function handleDownload(docId: string, docName: string) {
-        // TODO Phase 4: Replace this with a real call to Spring Boot to get the Pre-Signed URL
-        alert(`[Phase 4] Will fetch Pre-Signed URL for: ${docName} (ID: ${docId})\nThis will call Spring Boot at: GET /api/documents/${docId}`);
+        try {
+            if (!idToken) throw new Error("No auth token available");
+
+            // 1. Ask Spring Boot for the Pre-Signed URL
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/documents/${docId}`, {
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
+
+            if (!response.ok) {
+                let errorMsg = 'Failed to get document link';
+                if (response.status === 403) {
+                    errorMsg = 'Access Denied: You do not have the required role for this document.';
+                }
+                throw new Error(errorMsg);
+            }
+
+            const data = await response.json();
+
+            // 2. We got the S3 Pre-Signed URL! Now redirect the browser to start the direct download.
+            // The browser will directly download the file from S3, completely bypassing our Spring Boot server!
+            window.open(data.url, '_blank');
+
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error occurred';
+            alert(message);
+        }
     }
 
     async function handleLogout() {
@@ -66,8 +92,8 @@ export default function DashboardPage() {
                             <span className="text-slate-400 text-sm">{user.username}</span>
                             {role && (
                                 <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${role === 'ADMIN'
-                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                                     }`}>
                                     {role}
                                 </span>
@@ -122,8 +148,8 @@ export default function DashboardPage() {
 
                             <div className="flex items-center gap-3">
                                 <span className={`hidden sm:block text-xs px-2 py-1 rounded-md font-medium ${doc.requiredRole === 'ADMIN'
-                                        ? 'bg-amber-500/10 text-amber-500'
-                                        : 'bg-green-500/10 text-green-500'
+                                    ? 'bg-amber-500/10 text-amber-500'
+                                    : 'bg-green-500/10 text-green-500'
                                     }`}>
                                     {doc.requiredRole}
                                 </span>
