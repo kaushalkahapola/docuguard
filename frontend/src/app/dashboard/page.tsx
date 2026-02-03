@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
@@ -16,12 +16,42 @@ export default function DashboardPage() {
     const { user, idToken, role, isLoading, logout } = useAuth();
     const router = useRouter();
 
-    // Redirect to login if not authenticated
+    // Documents state
+    const [documents, setDocuments] = useState<any[]>([]);
+    const [fetchingDocs, setFetchingDocs] = useState(true);
+
+    // Upload state
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState('');
+    const [uploadSuccess, setUploadSuccess] = useState('');
+
+    // Fetch documents on load
     useEffect(() => {
         if (!isLoading && !user) {
             router.push('/login');
+            return;
         }
-    }, [user, isLoading, router]);
+
+        if (user && idToken) {
+            fetchDocuments();
+        }
+    }, [user, isLoading, router, idToken]);
+
+    async function fetchDocuments() {
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/documents`, {
+                headers: { Authorization: `Bearer ${idToken}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setDocuments(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch documents", error);
+        } finally {
+            setFetchingDocs(false);
+        }
+    }
 
     if (isLoading) {
         return (
@@ -64,14 +94,65 @@ export default function DashboardPage() {
         }
     }
 
+    async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        if (!e.target.files || e.target.files.length === 0) return;
+
+        const file = e.target.files[0];
+        setUploadError('');
+        setUploadSuccess('');
+        setIsUploading(true);
+
+        try {
+            // 1. Get Pre-Signed PUT URL from Backend
+            const backendRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/documents/upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    fileName: file.name,
+                    contentType: file.type || 'application/octet-stream'
+                })
+            });
+
+            if (!backendRes.ok) throw new Error("Failed to get upload URL");
+            const { uploadUrl } = await backendRes.json();
+
+            // 2. Upload file directly to S3
+            const s3Res = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: {
+                    'Content-Type': file.type || 'application/octet-stream'
+                }
+            });
+
+            if (!s3Res.ok) throw new Error("Failed to upload file to S3");
+
+            setUploadSuccess('File uploaded successfully! It will appear shortly once processed.');
+
+            // Clear the file input
+            e.target.value = '';
+
+            // Optional: refresh documents after a short delay so the SQS worker has time to save it to DB
+            setTimeout(fetchDocuments, 2000);
+
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Upload failed';
+            setUploadError(message);
+        } finally {
+            setIsUploading(false);
+        }
+    }
+
     async function handleLogout() {
         await logout();
         router.push('/login');
     }
 
-    const accessibleDocs = MOCK_DOCUMENTS.filter(
-        doc => role === 'ADMIN' || doc.requiredRole === 'USER'
-    );
+    // Removed hardcoded dummy filter
+    const accessibleDocs = documents;
 
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -126,6 +207,44 @@ export default function DashboardPage() {
                     </svg>
                     <span>Downloads are secured via AWS S3 Pre-Signed URLs. Each link expires in 5 minutes. Files never pass through the application server.</span>
                 </div>
+
+                {/* Admin Upload Section */}
+                {role === 'ADMIN' && (
+                    <div className="mb-8 p-6 bg-slate-800/80 border border-slate-700 rounded-xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+                        <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            Admin Upload Portal
+                        </h2>
+                        <p className="text-sm text-slate-400 mb-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                            Upload a document directly to S3. The background worker will automatically detect the upload resulting in the document appearing in the vault shortly after.
+                        </p>
+
+                        <div className="flex items-center gap-4">
+                            <label className={`
+                                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all
+                                ${isUploading
+                                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 hover:border-amber-500/50'}
+                            `}>
+                                <svg className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {isUploading ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    )}
+                                </svg>
+                                {isUploading ? 'Uploading to S3...' : 'Select File to Upload'}
+                                <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                            </label>
+
+                            {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
+                            {uploadSuccess && <p className="text-green-400 text-sm">{uploadSuccess}</p>}
+                        </div>
+                    </div>
+                )}
 
                 {/* Document Grid */}
                 <div className="grid gap-4">

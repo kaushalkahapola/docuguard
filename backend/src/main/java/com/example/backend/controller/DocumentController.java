@@ -1,6 +1,7 @@
 package com.example.backend.controller;
 
 import com.example.backend.model.Document;
+import com.example.backend.repository.DocumentRepository;
 import com.example.backend.service.S3Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,17 +17,65 @@ import java.util.Map;
 public class DocumentController {
 
     private final S3Service s3Service;
+    private final DocumentRepository documentRepository;
 
-    // Hardcoded documents for learning purposes.
-    // In a real app, this would be a Database table.
-    private static final List<Document> VAULT_DOCS = List.of(
-            new Document("doc-001", "Q4 Financial Report", "Finance", "ADMIN", "q4-financial.pdf"),
-            new Document("doc-002", "Employee Handbook", "HR", "USER", "employee-handbook.pdf"),
-            new Document("doc-003", "Annual Audit Report", "Finance", "ADMIN", "annual-audit.pdf"),
-            new Document("doc-004", "Onboarding Guide", "HR", "USER", "onboarding-guide.pdf"));
-
-    public DocumentController(S3Service s3Service) {
+    public DocumentController(S3Service s3Service, DocumentRepository documentRepository) {
         this.s3Service = s3Service;
+        this.documentRepository = documentRepository;
+    }
+
+    /**
+     * Endpoint to list all documents available to the logged-in user based on their
+     * role.
+     */
+    @GetMapping
+    public ResponseEntity<List<Document>> getAllDocuments(Authentication authentication) {
+        List<Document> allDocs = documentRepository.findAll();
+
+        boolean hasAdminRole = hasRole(authentication, "ADMIN");
+        boolean hasUserRole = hasRole(authentication, "USER");
+
+        if (hasAdminRole) {
+            return ResponseEntity.ok(allDocs);
+        } else if (hasUserRole) {
+            List<Document> userDocs = allDocs.stream()
+                    .filter(d -> "USER".equals(d.getRequiredRole()))
+                    .toList();
+            return ResponseEntity.ok(userDocs);
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    /**
+     * Endpoint for ADMINs to request an S3 Pre-Signed PUT URL to upload a new
+     * document securely.
+     */
+    @PostMapping("/upload")
+    public ResponseEntity<?> getUploadUrl(@RequestBody Map<String, String> body, Authentication authentication) {
+        if (!hasRole(authentication, "ADMIN")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Only ADMIN users can upload documents."));
+        }
+
+        String fileName = body.get("fileName");
+        String contentType = body.get("contentType");
+
+        if (fileName == null || contentType == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "fileName and contentType are required"));
+        }
+
+        // Generate the S3 Key (path) where it will be saved. We can use the category or
+        // role as a folder.
+        // E.g., "ADMIN/secret-file.pdf"
+        String objectKey = "ADMIN/" + fileName;
+
+        // Ask the S3 Service to mint a PUT url
+        String preSignedPutUrl = s3Service.generatePreSignedPutUrl(objectKey, contentType);
+
+        return ResponseEntity.ok(Map.of(
+                "uploadUrl", preSignedPutUrl,
+                "objectKey", objectKey));
     }
 
     /**
@@ -35,25 +84,19 @@ public class DocumentController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<?> getDocumentLink(@PathVariable String id, Authentication authentication) {
-        // Find the requested document
-        Document requestedDoc = VAULT_DOCS.stream()
-                .filter(d -> d.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+        // Find the requested document from Database
+        Document requestedDoc = documentRepository.findById(id).orElse(null);
 
         if (requestedDoc == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", "Document not found"));
         }
 
-        // Get the user's role from the JWT (Spring Security already validated the
-        // token!)
+        // Get the user's role from the JWT
         boolean hasAdminRole = hasRole(authentication, "ADMIN");
         boolean hasUserRole = hasRole(authentication, "USER");
 
-        // RBAC Logic:
-        // ADMIN can download anything.
-        // USER can only download documents marked for USER.
+        // RBAC Logic
         boolean isAuthorized = false;
 
         if (hasAdminRole) {
@@ -67,10 +110,10 @@ public class DocumentController {
                     .body(Map.of("error", "You do not have the required role to download this file."));
         }
 
-        // The user is authorized! So we ask S3 for a temporary direct-download link
+        // Generate S3 URL
         String preSignedUrl = s3Service.generatePreSignedUrl(requestedDoc.getObjectKey());
 
-        // We return the URL to the frontend.
+        // Return URL to frontend
         return ResponseEntity.ok(Map.of("url", preSignedUrl));
     }
 

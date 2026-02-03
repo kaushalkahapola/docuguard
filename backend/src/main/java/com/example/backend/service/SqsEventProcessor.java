@@ -1,14 +1,29 @@
 package com.example.backend.service;
 
+import com.example.backend.model.Document;
+import com.example.backend.repository.DocumentRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
 @Service
 public class SqsEventProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(SqsEventProcessor.class);
+    private final ObjectMapper objectMapper;
+    private final DocumentRepository documentRepository;
+
+    public SqsEventProcessor(ObjectMapper objectMapper, DocumentRepository documentRepository) {
+        this.objectMapper = objectMapper;
+        this.documentRepository = documentRepository;
+    }
 
     /**
      * This method runs asynchronously in the background. It constantly polls the
@@ -21,12 +36,63 @@ public class SqsEventProcessor {
         logger.info("==================================================");
         logger.info("SQS EVENT RECEIVED! New Document Uploaded to Vault");
         logger.info("Message Payload: {}", message);
-        logger.info("==================================================");
 
-        // In a real application, you would parse the JSON message here (e.g. using
-        // Jackson ObjectMapper)
-        // to extract the S3 Bucket Name and Object Key, and then perhaps save a record
-        // to a database
-        // so the frontend knows the file exists.
+        try {
+            JsonNode rootNode = objectMapper.readTree(message);
+
+            // S3 event payloads might be wrapped depending on how the queue is configured,
+            // but the standard S3 notification looks like this:
+            if (rootNode.has("Records")) {
+                for (JsonNode record : rootNode.get("Records")) {
+                    String eventName = record.path("eventName").asText();
+
+                    if (eventName.startsWith("ObjectCreated:")) {
+                        String bucketName = record.path("s3").path("bucket").path("name").asText();
+                        String objectKey = record.path("s3").path("object").path("key").asText();
+
+                        // AWS URL encodes the object key (e.g., spaces become +)
+                        String decodedKey = URLDecoder.decode(objectKey, StandardCharsets.UTF_8);
+
+                        logger.info("Parsed Upload: Bucket={}, Key={}", bucketName, decodedKey);
+
+                        // Extract nice name and role from the file name.
+                        // Example: "HR/employee-handbook.pdf" or just "q4-financial.pdf"
+                        // For simplicity, we'll extract the name without extension and default to USER
+                        String docName = extractNameFromKey(decodedKey);
+                        String category = "General";
+                        String requiredRole = "USER";
+
+                        // Very basic automatic folder/role mapping from the filename string path
+                        if (decodedKey.toLowerCase().contains("admin")
+                                || decodedKey.toLowerCase().contains("finance")) {
+                            requiredRole = "ADMIN";
+                            category = "Restricted";
+                        }
+
+                        // Save the newly uploaded document metadata to the H2 database
+                        Document newDoc = new Document(docName, category, requiredRole, decodedKey);
+                        documentRepository.save(newDoc);
+                        logger.info("Successfully Saved Document Metadata to H2 Database! ID: {}", newDoc.getId());
+                    }
+                }
+            }
+
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to parse SQS message JSON", e);
+        }
+
+        logger.info("==================================================");
+    }
+
+    private String extractNameFromKey(String key) {
+        // "folder/subfolder/file.pdf" -> "file.pdf"
+        String filename = key.substring(key.lastIndexOf("/") + 1);
+        // remove extension
+        int dotIndex = filename.lastIndexOf(".");
+        if (dotIndex > 0) {
+            filename = filename.substring(0, dotIndex);
+        }
+        // convert dashes/underscores to spaces and capitalize
+        return filename.replace("-", " ").replace("_", " ").toUpperCase();
     }
 }
