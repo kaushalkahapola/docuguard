@@ -60,15 +60,16 @@ public class DocumentController {
 
         String fileName = body.get("fileName");
         String contentType = body.get("contentType");
+        String role = body.getOrDefault("role", "USER");
 
         if (fileName == null || contentType == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "fileName and contentType are required"));
         }
 
-        // Generate the S3 Key (path) where it will be saved. We can use the category or
-        // role as a folder.
-        // E.g., "ADMIN/secret-file.pdf"
-        String objectKey = "ADMIN/" + fileName;
+        // Generate the S3 Key (path) where it will be saved. We use the role as a
+        // folder.
+        // E.g., "ADMIN/secret-file.pdf" or "USER/employee-handbook.pdf"
+        String objectKey = role + "/" + fileName;
 
         // Ask the S3 Service to mint a PUT url
         String preSignedPutUrl = s3Service.generatePreSignedPutUrl(objectKey, contentType);

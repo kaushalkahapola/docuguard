@@ -62,11 +62,14 @@ public class SqsEventProcessor {
                         String category = "General";
                         String requiredRole = "USER";
 
-                        // Very basic automatic folder/role mapping from the filename string path
-                        if (decodedKey.toLowerCase().contains("admin")
-                                || decodedKey.toLowerCase().contains("finance")) {
+                        // The frontend upload endpoint places the file in a folder matching the target
+                        // role
+                        if (decodedKey.startsWith("ADMIN/")) {
                             requiredRole = "ADMIN";
                             category = "Restricted";
+                        } else if (decodedKey.startsWith("USER/")) {
+                            requiredRole = "USER";
+                            category = "General";
                         }
 
                         // Save the newly uploaded document metadata to the H2 database

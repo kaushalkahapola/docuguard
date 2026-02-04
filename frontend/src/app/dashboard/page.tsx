@@ -24,6 +24,7 @@ export default function DashboardPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState('');
     const [uploadSuccess, setUploadSuccess] = useState('');
+    const [uploadRole, setUploadRole] = useState('USER');
 
     // Fetch documents on load
     useEffect(() => {
@@ -112,7 +113,8 @@ export default function DashboardPage() {
                 },
                 body: JSON.stringify({
                     fileName: file.name,
-                    contentType: file.type || 'application/octet-stream'
+                    contentType: file.type || 'application/octet-stream',
+                    role: uploadRole
                 })
             });
 
@@ -222,26 +224,40 @@ export default function DashboardPage() {
                             Upload a document directly to S3. The background worker will automatically detect the upload resulting in the document appearing in the vault shortly after.
                         </p>
 
-                        <div className="flex items-center gap-4">
-                            <label className={`
-                                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center gap-4">
+                                <label className="text-slate-400 text-sm">Target Role:</label>
+                                <select
+                                    value={uploadRole}
+                                    onChange={(e) => setUploadRole(e.target.value)}
+                                    disabled={isUploading}
+                                    className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:ring-amber-500 focus:border-amber-500 block p-2 outline-none"
+                                >
+                                    <option value="USER">USER (All Users)</option>
+                                    <option value="ADMIN">ADMIN (Admins Only)</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <label className={`
+                                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all
                                 ${isUploading
-                                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
-                                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 hover:border-amber-500/50'}
+                                        ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                                        : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 hover:border-amber-500/50'}
                             `}>
-                                <svg className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    {isUploading ? (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    ) : (
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    )}
-                                </svg>
-                                {isUploading ? 'Uploading to S3...' : 'Select File to Upload'}
-                                <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                            </label>
+                                    <svg className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        {isUploading ? (
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        ) : (
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        )}
+                                    </svg>
+                                    {isUploading ? 'Uploading to S3...' : 'Select File to Upload'}
+                                    <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                                </label>
 
-                            {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
-                            {uploadSuccess && <p className="text-green-400 text-sm">{uploadSuccess}</p>}
+                                {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
+                                {uploadSuccess && <p className="text-green-400 text-sm">{uploadSuccess}</p>}
+                            </div>
                         </div>
                     </div>
                 )}
