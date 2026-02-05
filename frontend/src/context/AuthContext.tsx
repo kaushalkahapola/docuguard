@@ -9,6 +9,8 @@ interface AuthContextType {
     role: string | null;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ requiresNewPassword: boolean }>;
+    signUp: (email: string, password: string) => Promise<void>;
+    confirmSignUpUser: (email: string, code: string) => Promise<void>;
     completeNewPassword: (newPassword: string) => Promise<void>;
     logout: () => Promise<void>;
 }
@@ -57,6 +59,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { requiresNewPassword: false };
     }
 
+    async function signUp(email: string, password: string) {
+        // AWS Amplify auth uses email as the default username
+        await import('aws-amplify/auth').then(mod => mod.signUp({
+            username: email,
+            password,
+            options: {
+                userAttributes: {
+                    email
+                }
+            }
+        }));
+    }
+
+    async function confirmSignUpUser(email: string, code: string) {
+        await import('aws-amplify/auth').then(mod => mod.confirmSignUp({
+            username: email,
+            confirmationCode: code
+        }));
+    }
+
     async function completeNewPassword(newPassword: string) {
         // Submit the new permanent password to AWS
         await confirmSignIn({ challengeResponse: newPassword });
@@ -71,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, idToken, role, isLoading, login, completeNewPassword, logout }}>
+        <AuthContext.Provider value={{ user, idToken, role, isLoading, login, signUp, confirmSignUpUser, completeNewPassword, logout }}>
             {children}
         </AuthContext.Provider>
     );

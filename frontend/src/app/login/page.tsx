@@ -5,13 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
-    const { login, completeNewPassword } = useAuth();
+    const { login, signUp, confirmSignUpUser, completeNewPassword } = useAuth();
     const router = useRouter();
 
     // Form States
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [newPassword, setNewPassword] = useState(''); // For the forced change
+    const [confirmationCode, setConfirmationCode] = useState('');
+
+    // Flow States
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
     const [requiresNewPassword, setRequiresNewPassword] = useState(false);
 
     // UI States
@@ -54,6 +59,41 @@ export default function LoginPage() {
         }
     }
 
+    // Handle New User Sign Up
+    async function handleSignUpSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+        try {
+            await signUp(email, password);
+            setIsConfirming(true);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Sign up failed. Please try again.';
+            setError(message);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    // Handle Confirmation Code
+    async function handleConfirmSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+        try {
+            await confirmSignUpUser(email, confirmationCode);
+            // Sign up complete! Switch to login mode.
+            setIsConfirming(false);
+            setIsSignUp(false);
+            alert("Registration successful! You can now sign in.");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Confirmation failed. Please check the code.';
+            setError(message);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
             <div className="w-full max-w-md">
@@ -71,7 +111,9 @@ export default function LoginPage() {
                 {/* Login Card */}
                 <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 shadow-2xl">
                     <h2 className="text-xl font-semibold text-white mb-6">
-                        {requiresNewPassword ? 'Set Permanent Password' : 'Sign In'}
+                        {requiresNewPassword ? 'Set Permanent Password'
+                            : isConfirming ? 'Verify Your Email'
+                                : isSignUp ? 'Create an Account' : 'Sign In'}
                     </h2>
 
                     {error && (
@@ -80,8 +122,68 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    {!requiresNewPassword ? (
-                        <form onSubmit={handleLoginSubmit} className="space-y-5">
+                    {requiresNewPassword ? (
+                        <form onSubmit={handleNewPasswordSubmit} className="space-y-5">
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4">
+                                <p className="text-amber-400 text-sm">
+                                    Since your account was just created by an administrator, AWS requires you to set a new permanent password.
+                                </p>
+                            </div>
+                            <div>
+                                <label htmlFor="new-password" className="block text-sm font-medium text-slate-300 mb-2">
+                                    New Permanent Password
+                                </label>
+                                <input
+                                    id="new-password"
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    required
+                                    minLength={8}
+                                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="Enter new password"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full py-3 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200"
+                            >
+                                {isLoading ? 'Saving...' : 'Set Password & Login'}
+                            </button>
+                        </form>
+                    ) : isConfirming ? (
+                        <form onSubmit={handleConfirmSubmit} className="space-y-5">
+                            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-4">
+                                <p className="text-blue-400 text-sm">
+                                    We sent a verification code to <strong>{email}</strong>. Please enter it below.
+                                </p>
+                            </div>
+                            <div>
+                                <label htmlFor="code" className="block text-sm font-medium text-slate-300 mb-2">
+                                    Verification Code
+                                </label>
+                                <input
+                                    id="code"
+                                    type="text"
+                                    value={confirmationCode}
+                                    onChange={e => setConfirmationCode(e.target.value)}
+                                    required
+                                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="123456"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full py-3 px-4 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200"
+                            >
+                                {isLoading ? 'Verifying...' : 'Verify Email'}
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={isSignUp ? handleSignUpSubmit : handleLoginSubmit} className="space-y-5">
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
                                     Email Address
@@ -117,39 +219,21 @@ export default function LoginPage() {
                                 disabled={isLoading}
                                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200"
                             >
-                                {isLoading ? 'Signing in...' : 'Sign In'}
+                                {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
                             </button>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleNewPasswordSubmit} className="space-y-5">
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4">
-                                <p className="text-amber-400 text-sm">
-                                    Since your account was just created by an administrator, AWS requires you to set a new permanent password.
-                                </p>
-                            </div>
-                            <div>
-                                <label htmlFor="new-password" className="block text-sm font-medium text-slate-300 mb-2">
-                                    New Permanent Password
-                                </label>
-                                <input
-                                    id="new-password"
-                                    type="password"
-                                    value={newPassword}
-                                    onChange={e => setNewPassword(e.target.value)}
-                                    required
-                                    minLength={8}
-                                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                    placeholder="Enter new password"
-                                />
-                            </div>
 
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full py-3 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200"
-                            >
-                                {isLoading ? 'Saving...' : 'Set Password & Login'}
-                            </button>
+                            <div className="text-center mt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSignUp(!isSignUp);
+                                        setError('');
+                                    }}
+                                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                >
+                                    {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+                                </button>
+                            </div>
                         </form>
                     )}
 

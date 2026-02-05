@@ -8,6 +8,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 
 @Configuration
 public class AwsConfig {
@@ -38,6 +39,14 @@ public class AwsConfig {
     @Bean
     public S3Presigner s3Presigner() {
         return S3Presigner.builder()
+                .region(Region.of(regionString))
+                .credentialsProvider(awsCredentialsProvider())
+                .build();
+    }
+
+    @Bean
+    public CognitoIdentityProviderClient cognitoIdentityProviderClient() {
+        return CognitoIdentityProviderClient.builder()
                 .region(Region.of(regionString))
                 .credentialsProvider(awsCredentialsProvider())
                 .build();
