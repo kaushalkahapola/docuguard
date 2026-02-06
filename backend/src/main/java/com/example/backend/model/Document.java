@@ -3,6 +3,7 @@ package com.example.backend.model;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -15,6 +16,7 @@ public class Document {
     private String category;
     private String requiredRole;
     private String objectKey;
+    private Instant createdAt;
 
     // JPA requires a no-args constructor
     public Document() {
@@ -26,6 +28,7 @@ public class Document {
         this.category = category;
         this.requiredRole = requiredRole;
         this.objectKey = objectKey;
+        this.createdAt = Instant.now();
     }
 
     // Getters
@@ -49,6 +52,10 @@ public class Document {
         return objectKey;
     }
 
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     // Setters
     public void setId(String id) {
         this.id = id;
@@ -68,5 +75,9 @@ public class Document {
 
     public void setObjectKey(String objectKey) {
         this.objectKey = objectKey;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 }

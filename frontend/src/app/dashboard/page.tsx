@@ -16,6 +16,12 @@ export default function DashboardPage() {
     const { user, idToken, role, isLoading, logout } = useAuth();
     const router = useRouter();
 
+    // Format dates nicely
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+
     // Documents state
     const [documents, setDocuments] = useState<any[]>([]);
     const [fetchingDocs, setFetchingDocs] = useState(true);
@@ -25,6 +31,12 @@ export default function DashboardPage() {
     const [uploadError, setUploadError] = useState('');
     const [uploadSuccess, setUploadSuccess] = useState('');
     const [uploadRole, setUploadRole] = useState('USER');
+
+    // Create User state
+    const [newUserEmail, setNewUserEmail] = useState('');
+    const [newUserRole, setNewUserRole] = useState('USER');
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
+    const [createUserMsg, setCreateUserMsg] = useState({ type: '', text: '' });
 
     // Fetch documents on load
     useEffect(() => {
@@ -148,6 +160,36 @@ export default function DashboardPage() {
         }
     }
 
+    async function handleCreateUser(e: React.FormEvent) {
+        e.preventDefault();
+        setCreateUserMsg({ type: '', text: '' });
+        setIsCreatingUser(true);
+
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ email: newUserEmail, role: newUserRole })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || "Failed to create user");
+
+            setCreateUserMsg({ type: 'success', text: data.message });
+            setNewUserEmail('');
+            setNewUserRole('USER');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error creating user';
+            setCreateUserMsg({ type: 'error', text: message });
+        } finally {
+            setIsCreatingUser(false);
+        }
+    }
+
     async function handleLogout() {
         await logout();
         router.push('/login');
@@ -255,52 +297,139 @@ export default function DashboardPage() {
                                     <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
                                 </label>
 
-                                {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
-                                {uploadSuccess && <p className="text-green-400 text-sm">{uploadSuccess}</p>}
+                                {uploadError && <p className="text-red-400 text-sm mt-3">{uploadError}</p>}
+                                {uploadSuccess && <p className="text-green-400 text-sm mt-3">{uploadSuccess}</p>}
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Document Grid */}
-                <div className="grid gap-4">
-                    {accessibleDocs.map(doc => (
-                        <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-5 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-slate-600 transition-all group"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="text-white font-medium">{doc.name}</p>
-                                    <p className="text-slate-500 text-sm">{doc.category} • {doc.size}</p>
-                                </div>
-                            </div>
+                {/* Admin User Management Section */}
+                {role === 'ADMIN' && (
+                    <div className="mb-8 p-6 bg-slate-800/80 border border-slate-700 rounded-xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+                        <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                            Add New User (Admin Only)
+                        </h2>
+                        <p className="text-sm text-slate-400 mb-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                            Create a new account in AWS Cognito. AWS will email them a temporary password.
+                            Upon first login, they must set a permanent password.
+                        </p>
 
-                            <div className="flex items-center gap-3">
-                                <span className={`hidden sm:block text-xs px-2 py-1 rounded-md font-medium ${doc.requiredRole === 'ADMIN'
-                                    ? 'bg-amber-500/10 text-amber-500'
-                                    : 'bg-green-500/10 text-green-500'
-                                    }`}>
-                                    {doc.requiredRole}
-                                </span>
-                                <button
-                                    id={`download-${doc.id}`}
-                                    onClick={() => handleDownload(doc.id, doc.name)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-600/30 hover:border-blue-600 rounded-lg text-sm font-medium transition-all duration-200"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Download
-                                </button>
+                        <form onSubmit={handleCreateUser} className="flex flex-col sm:flex-row items-end gap-4">
+                            <div className="w-full sm:w-1/3">
+                                <label className="block text-slate-400 text-sm mb-1">Email Address</label>
+                                <input
+                                    type="email"
+                                    value={newUserEmail}
+                                    onChange={(e) => setNewUserEmail(e.target.value)}
+                                    required
+                                    disabled={isCreatingUser}
+                                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2 outline-none"
+                                    placeholder="newuser@example.com"
+                                />
                             </div>
-                        </div>
-                    ))}
+                            <div className="w-full sm:w-1/4">
+                                <label className="block text-slate-400 text-sm mb-1">Initial Role</label>
+                                <select
+                                    value={newUserRole}
+                                    onChange={(e) => setNewUserRole(e.target.value)}
+                                    disabled={isCreatingUser}
+                                    className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2 outline-none"
+                                >
+                                    <option value="USER">USER</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                </select>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isCreatingUser}
+                                className={`
+                                    px-4 py-2 rounded-lg text-sm font-medium transition-all
+                                    ${isCreatingUser
+                                        ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                                        : 'bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/50'}
+                                `}
+                            >
+                                {isCreatingUser ? 'Creating...' : 'Create Cognito User'}
+                            </button>
+                        </form>
+
+                        {createUserMsg.text && (
+                            <p className={`mt-3 text-sm ${createUserMsg.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                                {createUserMsg.text}
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* Document Data Table */}
+                <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden shadow-xl">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-slate-300">
+                            <thead className="text-xs text-slate-400 uppercase bg-slate-800/80 border-b border-slate-700">
+                                <tr>
+                                    <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Document Name</th>
+                                    <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Category</th>
+                                    <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Access Level</th>
+                                    <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Date Added</th>
+                                    <th scope="col" className="px-6 py-4 font-semibold tracking-wider text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700/50">
+                                {accessibleDocs.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                                            {fetchingDocs ? 'Loading documents...' : 'No documents available in the vault.'}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    accessibleDocs.map(doc => (
+                                        <tr key={doc.id} className="hover:bg-slate-700/30 transition-colors group">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded bg-red-500/10 flex items-center justify-center flex-shrink-0 border border-red-500/20">
+                                                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                    </div>
+                                                    <span className="font-medium text-slate-200 group-hover:text-blue-400 transition-colors">{doc.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-slate-400">{doc.category}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold tracking-wide border ${doc.requiredRole === 'ADMIN'
+                                                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                                        : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                    }`}>
+                                                    {doc.requiredRole}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-slate-400">
+                                                {formatDate(doc.createdAt)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <button
+                                                    onClick={() => handleDownload(doc.id, doc.name)}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-600/20 hover:border-blue-600 rounded-lg text-sm font-medium transition-all"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                    </svg>
+                                                    Download
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>
