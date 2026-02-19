@@ -10,41 +10,27 @@ This project serves as a comprehensive demonstration of deep IAM integration, OA
 
 DocuGuard is built using a decoupled architecture, separating the client interface from the API and utilizing managed AWS services for heavy lifting (auth, storage, messaging).
 
-```mermaid
-flowchart TB
-    subgraph Frontend["Frontend (Next.js)"]
-        UI["React Dashboard UI"]
-        Amplify["AWS Amplify Auth"]
-    end
-
-    subgraph Backend["Backend (Spring Boot)"]
-        API["REST API (Port 8080)"]
-        Sec["Spring Security (OAuth2)"]
-        Service["DocuGuard Service"]
-        DB[(Amazon RDS / MySQL)]
-    end
-
-    subgraph AWS["AWS Cloud Infrastructure"]
-        Cognito["Amazon Cognito\n(User Pool)"]
-        S3["Amazon S3\n(Document Vault)"]
-        SQS["Amazon SQS\n(Event Queue)"]
-    end
-
-    %% Flow
-    User((User)) --> UI
-    UI <--> |"1. Authenticate"| Cognito
-    UI <--> |"2. Request S3 URL (Passes JWT)"| API
-    API --> Sec
-    Sec -.-> |"3. Verify Key & Role Claim"| Cognito
-    Sec --> Service
-    Service <--> |"4. Request/Update Metadata"| DB
-    Service -.-> |"5. Generate Pre-Signed URL"| S3
-    Service --> |"6. Return Temporary URL"| UI
-    UI <--> |"7. Direct S3 Upload/Download"| S3
-
-    %% Event Driven processing
-    S3 -- "8. ObjectCreated Event" --> SQS
-    SQS -- "9. @SqsListener Async Poll" --> Service
+```text
++-----------------------+           +-------------------------+
+|     FRONTEND (UI)     |           |   BACKEND (REST API)    |
+|   Next.js / React     | <-------> |  Spring Boot (Java 17)  |
+|                       |           |  Spring Security OAuth2 |
++-----------------------+           +-------------------------+
+     |             ^                       |            ^
+     |             |                       |            |
+     v             v                       v            v
++-------------------------------------------------------------+
+|                     AWS INFRASTRUCTURE                      |
+|                                                             |
+|  [ Cognito ] <------> (Auth / JWT / Roles)                  |
+|                                                             |
+|  [ S3 ]      <------> (Document Vault / Pre-Signed URLs)    |
+|      \                                                      |
+|       \--> [ SQS ] -> (Event Queue for Uploads)             |
+|                \                                            |
+|                 \---> [ EC2 & RDS MySQL ]                   |
+|                       (App Hosting & Database)              |
++-------------------------------------------------------------+
 ```
 
 ### 1. Frontend (Next.js & React)
