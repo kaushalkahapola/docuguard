@@ -10,28 +10,7 @@ This project serves as a comprehensive demonstration of deep IAM integration, OA
 
 DocuGuard is built using a decoupled architecture, separating the client interface from the API and utilizing managed AWS services for heavy lifting (auth, storage, messaging).
 
-```text
-+-----------------------+           +-------------------------+
-|     FRONTEND (UI)     |           |   BACKEND (REST API)    |
-|   Next.js / React     | <-------> |  Spring Boot (Java 17)  |
-|                       |           |  Spring Security OAuth2 |
-+-----------------------+           +-------------------------+
-     |             ^                       |            ^
-     |             |                       |            |
-     v             v                       v            v
-+-------------------------------------------------------------+
-|                     AWS INFRASTRUCTURE                      |
-|                                                             |
-|  [ Cognito ] <------> (Auth / JWT / Roles)                  |
-|                                                             |
-|  [ S3 ]      <------> (Document Vault / Pre-Signed URLs)    |
-|      \                                                      |
-|       \--> [ SQS ] -> (Event Queue for Uploads)             |
-|                \                                            |
-|                 \---> [ EC2 & RDS MySQL ]                   |
-|                       (App Hosting & Database)              |
-+-------------------------------------------------------------+
-```
+![DocuGuard Architecture Diagram](media/architecture.png)
 
 ### 1. Frontend (Next.js & React)
 - **Framework:** Next.js (App Router), React, Tailwind CSS.
