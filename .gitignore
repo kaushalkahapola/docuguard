@@ -1,3 +1,15 @@
 .vscode
 docs
 *.pem
+
+# Local environment files (keep examples committed)
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+!.env.example
+!backend/.env.example
+!frontend/.env.example

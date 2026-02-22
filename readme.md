@@ -92,21 +92,33 @@ To run this locally, you must have an AWS Account with the following provisioned
 
 ### 2. Backend Setup
 1. Navigate to the `backend/` directory.
-2. Update `src/main/resources/application.properties` with your AWS credentials, Cognito details, and Database connection string.
-3. Run the server:
+2. Create your local env file from the template:
+   ```bash
+   cp .env.example .env
+   ```
+3. Fill `.env` with your AWS, Cognito, S3/SQS, and DB values.
+4. Export variables for the current shell session:
+   ```bash
+   set -a && source .env && set +a
+   ```
+5. Run the server:
    ```bash
    ./gradlew bootRun
    ```
 
 ### 3. Frontend Setup
 1. Navigate to the `frontend/` directory.
-2. Create a `.env.local` file:
+2. Create your local env file from the template:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Update `.env.local` with your values:
    ```env
    NEXT_PUBLIC_API_URL=http://localhost:8080
    NEXT_PUBLIC_COGNITO_USER_POOL_ID=<your-pool-id>
    NEXT_PUBLIC_COGNITO_CLIENT_ID=<your-client-id>
    ```
-3. Install dependencies and run:
+4. Install dependencies and run:
    ```bash
    npm install
    npm run dev

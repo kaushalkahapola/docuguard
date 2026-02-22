@@ -36,5 +36,4 @@ out/
 ### VS Code ###
 .vscode/
 
-# Ignore AWS secrets
-src/main/resources/application.properties
+# Keep application config in repo with environment placeholders only.
