@@ -13,3 +13,13 @@ frontend/.env.local
 !.env.example
 !backend/.env.example
 !frontend/.env.example
+
+# Terraform generated files
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+**/terraform.tfvars
+**/*.auto.tfvars
+**/backend.hcl
+**/*.hcl

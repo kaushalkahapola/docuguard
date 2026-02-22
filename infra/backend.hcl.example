@@ -1,0 +1,5 @@
+bucket         = "docuguard-tf-state-<unique-suffix>"
+key            = "docuguard/terraform.tfstate"
+region         = "ap-south-1"
+dynamodb_table = "docuguard-tf-locks"
+encrypt        = true

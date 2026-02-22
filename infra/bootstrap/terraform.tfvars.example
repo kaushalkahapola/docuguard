@@ -1,0 +1,3 @@
+aws_region           = "ap-south-1"
+tf_state_bucket_name = "docuguard-tf-state-<unique-suffix>"
+tf_lock_table_name   = "docuguard-tf-locks"

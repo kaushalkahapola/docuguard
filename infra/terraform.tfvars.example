@@ -1,0 +1,25 @@
+project_name = "docuguard"
+environment  = "main"
+aws_region   = "ap-south-1"
+
+allowed_cors_origins = [
+  "http://localhost:3000"
+]
+
+# Use the default VPC by leaving this empty, or set an explicit VPC ID.
+vpc_id = ""
+
+# RDS settings
+db_instance_class       = "db.t4g.micro"
+db_allocated_storage    = 20
+db_engine_version       = "8.0"
+db_name                 = "docuguard"
+db_username             = "admin"
+db_password             = "<set-secure-password>"
+db_publicly_accessible  = true
+db_allowed_cidr_blocks  = ["0.0.0.0/0"]
+db_skip_final_snapshot  = true
+db_deletion_protection  = false
+db_multi_az             = false
+
+s3_force_destroy = true
