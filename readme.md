@@ -112,8 +112,3 @@ To run this locally, you must have an AWS Account with the following provisioned
    npm run dev
    ```
 
----
-
-## ☁️ Deployment
-
-Please refer to the enclosed `aws_deployment_guide.md` for comprehensive, step-by-step instructions on deploying the unified architecture to Amazon EC2 and Vercel/Amplify.
